@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\AI\AIManager;
 use App\Services\TelegramService;
+use App\Services\TransactionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -11,11 +12,13 @@ class TelegramWebhookController extends Controller
 {
     protected TelegramService $telegram;
     protected AIManager $ai;
+    protected TransactionService $transactionService;
 
-    public function __construct(TelegramService $telegram, AIManager $ai)
+    public function __construct(TelegramService $telegram, AIManager $ai, TransactionService $transactionService)
     {
         $this->telegram = $telegram;
         $this->ai = $ai;
+        $this->transactionService = $transactionService;
     }
 
     /**
@@ -103,18 +106,26 @@ class TelegramWebhookController extends Controller
             return response()->json(['status' => 'success', 'type' => 'nlp_failed']);
         }
 
+        // Save to database
+        $transaction = $this->transactionService->createFromTelegram($parsed, (string)$chatId);
+
+        if (!$transaction) {
+            $this->telegram->sendMessage($chatId, "⚠️ Terjadi kesalahan saat menyimpan data. Silakan coba lagi nanti.");
+            return response()->json(['status' => 'error', 'message' => 'Failed to save transaction']);
+        }
+
         $type = ($parsed['type'] === 'income') ? '🟢 Pemasukan' : '🔴 Pengeluaran';
         $amount = number_format($parsed['amount'], 0, ',', '.');
         $category = $parsed['category'] ?? 'Umum';
         $description = $parsed['description'] ?? '-';
         $driver = $parsed['_ai_driver'] ?? 'unknown';
 
-        $reply = "✅ **Data Terdeteksi ({$driver})**\n\n" .
+        $reply = "✅ **Berhasil Dicatat!**\n\n" .
                  "• **Tipe**: {$type}\n" .
                  "• **Jumlah**: Rp {$amount}\n" .
                  "• **Kategori**: {$category}\n" .
                  "• **Deskripsi**: {$description}\n\n" .
-                 "*(Data ini belum disimpan. Database akan hadir di Epic 3)*";
+                 "*(Data telah aman disimpan di database)*";
         
         $this->telegram->sendMessage($chatId, $reply);
         return response()->json(['status' => 'success', 'type' => 'nlp_parsed', 'data' => $parsed]);
