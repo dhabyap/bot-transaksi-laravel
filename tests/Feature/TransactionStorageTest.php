@@ -51,12 +51,12 @@ class TransactionStorageTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson(['status' => 'success', 'type' => 'record']);
 
-        // Verify Database
+        // Verify Database with legacy column names
         $this->assertDatabaseHas('transactions', [
-            'telegram_user_id' => $chatId,
-            'amount' => 50000,
-            'category' => 'Bensin',
-            'type' => 'expense'
+            'user_id' => $chatId,
+            'nominal' => 50000,
+            'kategori' => 'Bensin',
+            'tipe' => 'expense'
         ]);
 
         $transaction = Transaction::first();

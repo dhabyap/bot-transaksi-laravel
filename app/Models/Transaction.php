@@ -10,16 +10,23 @@ class Transaction extends Model
     use HasFactory;
 
     protected $fillable = [
-        'telegram_user_id',
-        'type',
-        'amount',
-        'category',
-        'description',
+        'user_id',
+        'tipe',
+        'nominal',
+        'kategori',
+        'item',
+        'timestamp', // Legacy datetime column
         'metadata',
     ];
 
     protected $casts = [
         'metadata' => 'array',
-        'amount' => 'decimal:2',
+        'nominal' => 'double',
+        'timestamp' => 'datetime',
     ];
+
+    /**
+     * Map the legacy timestamp column to created_at if necessary, 
+     * or handle it manually.
+     */
 }

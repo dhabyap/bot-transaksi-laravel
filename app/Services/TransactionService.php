@@ -18,11 +18,12 @@ class TransactionService
     {
         try {
             return Transaction::create([
-                'telegram_user_id' => $telegramUserId,
-                'type' => $data['type'],
-                'amount' => $data['amount'],
-                'category' => $data['category'] ?? 'Umum',
-                'description' => $data['description'] ?? null,
+                'user_id' => $telegramUserId,
+                'tipe' => $data['type'],
+                'nominal' => $data['amount'],
+                'kategori' => $data['category'] ?? 'Umum',
+                'item' => $data['description'] ?? null,
+                'timestamp' => now(), // Fill the legacy timestamp column
                 'metadata' => [
                     'ai_driver' => $data['_ai_driver'] ?? 'unknown',
                     'source' => 'telegram'

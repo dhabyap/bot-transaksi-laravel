@@ -20,10 +20,10 @@ class AIContextTest extends TestCase
 
         // Seed an existing category
         Transaction::create([
-            'telegram_user_id' => $chatId,
-            'amount' => 1000,
-            'type' => 'expense',
-            'category' => 'Hobi',
+            'user_id' => $chatId,
+            'nominal' => 1000,
+            'tipe' => 'expense',
+            'kategori' => 'Hobi',
         ]);
 
         config(['services.groq.key' => 'test-key']);
@@ -69,8 +69,8 @@ class AIContextTest extends TestCase
         $response->assertJson(['status' => 'success', 'type' => 'record']);
         
         $this->assertDatabaseHas('transactions', [
-            'telegram_user_id' => $chatId,
-            'category' => 'Hobi'
+            'user_id' => $chatId,
+            'kategori' => 'Hobi'
         ]);
     }
 }
