@@ -1,31 +1,31 @@
-# Project Epics & Architecture Draft: AI Transaction Bot
+# AI Transaction Bot - Legacy Migration & Expansion Roadmap
 
-Dokumen ini merangkum *High-Level Overview* (HLO) dan *Epics* (Issues besar) dari arsitektur sistem Bot Telegram untuk pencatatan transaksi menggunakan AI. Pendekatan ini berfokus pada kapabilitas sistem, aliran data, dan fondasi aplikasi dibanding detail implementasi *coding*.
+Dokumen ini melacak integrasi Laravel dengan skema database legacy Python dan pengembangan fitur lanjutan.
 
-## Epic 1: Telegram Ingestion & Interface Layer
-**Objective:** Membangun "Pintu Masuk" yang aman dan responsif untuk interaksi dengan pengguna via Telegram.
-- [ ] **Webhook Gateway**: Menyediakan *endpoint* API berkecepatan tinggi pada Laravel untuk menerima dan mem-parsing payload dari Telegram secara sinkron.
-- [ ] **Authentication & Security Guard**: Merancang mekanisme otentikasi untuk menentukan apakah bot ini bersifat *Single-Tenant* (hanya Anda yang boleh pakai) atau *Multi-Tenant* (publik). Bot harus mengabaikan payload dari *unauthorized sources*.
-- [ ] **Command vs. NLP Router**: Middleware atau mekanisme *Routing* yang bisa memisahkan pesan mana yang merupakan "Native Command" (seperti `/start`, `/help`, `/report`) dan mana yang merupakan "Natural Text" untuk dieksekusi oleh AI.
+## Epic 6: Legacy Database Alignment (Priority: High)
+*Tujuan: Mengubah skema Laravel agar serasi dengan database Python yang sudah ada.*
 
-## Epic 2: AI-Powered NLP Engine (Data Extraction)
-**Objective:** Menggunakan LLM (Large Language Model) untuk mengekstraksi instruksi bebas menjadi struktur data baku.
-- [ ] **LLM Integration Strategy**: Menghubungkan Laravel dengan Provider AI (seperti Google Gemini / OpenAI) menggunakan HTTP client atau SDK, diposisikan secara terisolasi sebagai satu unit *Service*.
-- [ ] **Prompt Engineering & Context Injection**: Mengamankan arsitektur dari *hallucination* dengan mendesain Prompt yang memaksa AI selalu mengembalikan skema JSON statis yang terprediksi (tipe transaksi, besaran uang, dan kategori).
-- [ ] **Data Sanitization & Fallback Loop**: Lapisan pertahanan jika output AI rusak (JSON *malformed*). Sistem harus dengan gracefully menolak input dan meminta user mengulangi pesan (*"Format chat tidak dikenali, coba lagi"*).
+- [ ] **Schema Renaming**: Mengubah kolom `transactions` (telegram_user_id -> user_id, amount -> nominal, type -> tipe, category -> kategori, description -> item).
+- [ ] **Data Type Sync**: Menyesuaikan tipe `nominal` menjadi `DOUBLE`.
+- [ ] **Model Refactoring**: Update Eloquent Models agar sinkron dengan penamaan kolom baru.
+- [ ] **Verification**: Memastikan logic AI extraction tetap bekerja dengan mapping kolom baru.
 
-## Epic 3: Core Transaction Data Domain
-**Objective:** Menyimpan dan mengelola siklus hidup data finansial secara presisi dan terstruktur di *Database Layer*.
-- [ ] **Financial Schema Architecture**: Merancang arsitektur database untuk transaksi yang tangguh untuk query dan analitik agregat (*summing*, *filtering by range*).
-- [ ] **Transaction Business Logic**: Membangun *Service Layer* aplikasi untuk mengeksekusi operasi finansial inti secara aman tanpa meletakkannya langsung di *Controller*.
-- [ ] **System Extensibility**: Memastikan tabel dirancang sedemikian rupa agar di masa depan dapat mendukung multicurrency atau tag/kategori kustom secara dinamis per-pengguna.
+## Epic 7: User Tracking & Chat Logging
+*Tujuan: Memonitor aktivitas pengguna dan menyimpan jejak percakapan.*
 
-## Epic 4: Feedback Loop & Insight Reporting
-**Objective:** Memberikan *User Experience* (UX) yang canggih dimana bot menjadi asisten pintar rekapitulasi data.
-- [ ] **Real-time Acknowledgment**: Respons instan setiap sebuah transaksi berhasil diamankan di database (Contoh: *"✅ Dicatat: Rp 20.000 ke kategori Makanan"*).
-- [ ] **On-Demand Analytical Queries**: Kemampuan bot untuk merespons permintaan insight dari user di chat. (Contoh: *"Berapa pengeluaran saya minggu ini?"* -> Diubah menjadi database filter -> Dikirim balik sebagai laporan teks).
-- [ ] **(Optional) Scheduled Aggregation**: *Cron Job* harian yang mendorong notifikasi rekap (misal: pengingat sisa budget atau saldo harian) menggunakan *Task Scheduling* bawaan Laravel.
+- [ ] **User Table Implementation**: Membuat tabel `bot_users` sesuai legacy (`first_seen`, `last_active`, `message_count`).
+- [ ] **Chat Logs Table**: Membuat tabel `chat_logs` untuk menyimpan data mentah pesan teks dari Telegram.
+- [ ] **Activity Middleware**: Otomatis memperbarui `last_active` dan menambah `message_count` setiap kali pengguna berinteraksi.
 
----
-**Status Dokumen**: *Draft - Dalam Tahapan Diskusi*  
-*Issue tracker ini dirancang agar mudah diekstrak menjadi tiket/issues ke GitHub saat development skala penuh dimulai.*
+## Epic 8: Inventory Management System
+*Tujuan: Implementasi fitur manajemen stok barang.*
+
+- [ ] **Inventory Schema**: Membuat tabel `inventory` (`nama_barang`, `kuantitas`, `status`).
+- [ ] **AI Inventory Extraction**: Update NLP Engine agar bisa mendeteksi perintah inventaris (misal: "Stok beras bertambah 5kg" atau "Barang masuk: Kopi 10 box").
+- [ ] **Inventory Insight**: Fitur laporan untuk melihat daftar stok saat ini via perintah bot.
+
+## Epic 9: System Hardening & Cleanup
+*Tujuan: Optimasi final dan migrasi server.*
+
+- [ ] **Database Migration Plan**: Dokumentasi langkah-langkah migrasi data dari database SQL Python lama ke Laravel.
+- [ ] **Environment Audit**: Memastikan semua API Key dan konfigurasi cPanel siap untuk tahap produksi.
