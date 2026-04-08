@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\AI\AIManager;
 use App\Services\TelegramService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -9,10 +10,12 @@ use Illuminate\Support\Facades\Log;
 class TelegramWebhookController extends Controller
 {
     protected TelegramService $telegram;
+    protected AIManager $ai;
 
-    public function __construct(TelegramService $telegram)
+    public function __construct(TelegramService $telegram, AIManager $ai)
     {
         $this->telegram = $telegram;
+        $this->ai = $ai;
     }
 
     /**
@@ -93,12 +96,27 @@ class TelegramWebhookController extends Controller
      */
     protected function handleNaturalLanguage($chatId, $text)
     {
-        // For Epic 1, we just acknowledge the message.
-        // Full AI parsing will be implemented in Epic 2.
+        $parsed = $this->ai->parseTransaction($text);
+
+        if (!$parsed) {
+            $this->telegram->sendMessage($chatId, "🤔 Maaf, saya tidak mengerti maksud Anda. Bisa diulangi dengan lebih jelas? (Contoh: \"Beli bakso 15rb\")");
+            return response()->json(['status' => 'success', 'type' => 'nlp_failed']);
+        }
+
+        $type = ($parsed['type'] === 'income') ? '🟢 Pemasukan' : '🔴 Pengeluaran';
+        $amount = number_format($parsed['amount'], 0, ',', '.');
+        $category = $parsed['category'] ?? 'Umum';
+        $description = $parsed['description'] ?? '-';
+        $driver = $parsed['_ai_driver'] ?? 'unknown';
+
+        $reply = "✅ **Data Terdeteksi ({$driver})**\n\n" .
+                 "• **Tipe**: {$type}\n" .
+                 "• **Jumlah**: Rp {$amount}\n" .
+                 "• **Kategori**: {$category}\n" .
+                 "• **Deskripsi**: {$description}\n\n" .
+                 "*(Data ini belum disimpan. Database akan hadir di Epic 3)*";
         
-        $message = "🤖 Saya telah menerima pesan Anda: \"{$text}\"\n\nFitur pengolah AI sedang dalam tahap pengembangan. Nantikan di update selanjutnya!";
-        
-        $this->telegram->sendMessage($chatId, $message);
-        return response()->json(['status' => 'success', 'type' => 'nlp']);
+        $this->telegram->sendMessage($chatId, $reply);
+        return response()->json(['status' => 'success', 'type' => 'nlp_parsed', 'data' => $parsed]);
     }
 }
