@@ -32,9 +32,9 @@ class AIManager
         ];
 
         if ($telegramUserId) {
-            $context['categories'] = Transaction::where('telegram_user_id', $telegramUserId)
+            $context['categories'] = Transaction::where('user_id', $telegramUserId)
                 ->distinct()
-                ->pluck('category')
+                ->pluck('kategori')
                 ->toArray();
         }
 

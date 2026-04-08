@@ -19,20 +19,20 @@ class ReportTest extends TestCase
     {
         $chatId = '123456789';
 
-        // Seed some data
+        // Seed some data using legacy column names
         Transaction::create([
-            'telegram_user_id' => $chatId,
-            'amount' => 100000,
-            'type' => 'income',
-            'category' => 'Gaji',
+            'user_id' => $chatId,
+            'nominal' => 100000,
+            'tipe' => 'income',
+            'kategori' => 'Gaji',
             'created_at' => Carbon::today()
         ]);
 
         Transaction::create([
-            'telegram_user_id' => $chatId,
-            'amount' => 30000,
-            'type' => 'expense',
-            'category' => 'Makan',
+            'user_id' => $chatId,
+            'nominal' => 30000,
+            'tipe' => 'expense',
+            'kategori' => 'Makan',
             'created_at' => Carbon::today()
         ]);
 
@@ -67,7 +67,7 @@ class ReportTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson(['status' => 'success', 'type' => 'report']);
 
-        // Since we mock Telegram API, we can't see the message body here easily without custom assertion 
-        // but the 'report' type confirms the logic path.
+        // Verify report data in the response if needed, 
+        // but 'report' confirmed the route and logic passed with new schema.
     }
 }

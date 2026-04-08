@@ -17,7 +17,7 @@ class ReportService
      */
     public function getSummary(string $telegramUserId, string $range = 'today'): array
     {
-        $query = Transaction::where('telegram_user_id', $telegramUserId);
+        $query = Transaction::where('user_id', $telegramUserId);
 
         switch ($range) {
             case 'week':
@@ -32,8 +32,8 @@ class ReportService
         }
 
         $stats = $query->select(
-            DB::raw("SUM(CASE WHEN type = 'income' THEN amount ELSE 0 END) as total_income"),
-            DB::raw("SUM(CASE WHEN type = 'expense' THEN amount ELSE 0 END) as total_expense")
+            DB::raw("SUM(CASE WHEN tipe = 'income' THEN nominal ELSE 0 END) as total_income"),
+            DB::raw("SUM(CASE WHEN tipe = 'expense' THEN nominal ELSE 0 END) as total_expense")
         )->first();
 
         $income = (float)($stats->total_income ?? 0);
@@ -53,14 +53,14 @@ class ReportService
      */
     public function getCategoryBreakdown(string $telegramUserId, string $range = 'month'): array
     {
-        $query = Transaction::where('telegram_user_id', $telegramUserId)
-            ->where('type', 'expense');
+        $query = Transaction::where('user_id', $telegramUserId)
+            ->where('tipe', 'expense');
 
         if ($range === 'month') {
             $query->where('created_at', '>=', Carbon::now()->startOfMonth());
         }
 
-        return $query->select('category', DB::raw('SUM(amount) as total'))
+        return $query->select('kategori as category', DB::raw('SUM(nominal) as total'))
             ->groupBy('category')
             ->orderByDesc('total')
             ->get()
