@@ -24,11 +24,13 @@ class TransactionStorageTest extends TestCase
                     [
                         'message' => [
                             'content' => json_encode([
-                                'type' => 'expense',
-                                'amount' => 50000,
-                                'category' => 'Bensin',
-                                'description' => 'Beli bensin pertamax',
-                                '_ai_driver' => 'groq'
+                                'intent' => 'RECORD',
+                                'data' => [
+                                    'type' => 'expense',
+                                    'amount' => 50000,
+                                    'category' => 'Bensin',
+                                    'description' => 'Beli bensin pertamax'
+                                ]
                             ])
                         ]
                     ]
@@ -47,7 +49,7 @@ class TransactionStorageTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJson(['status' => 'success', 'type' => 'nlp_parsed']);
+        $response->assertJson(['status' => 'success', 'type' => 'record']);
 
         // Verify Database
         $this->assertDatabaseHas('transactions', [

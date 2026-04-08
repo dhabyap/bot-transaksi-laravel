@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Services\AI\AIManager;
 use App\Services\TelegramService;
 use App\Services\TransactionService;
+use App\Services\ReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 
@@ -13,12 +14,18 @@ class TelegramWebhookController extends Controller
     protected TelegramService $telegram;
     protected AIManager $ai;
     protected TransactionService $transactionService;
+    protected ReportService $reportService;
 
-    public function __construct(TelegramService $telegram, AIManager $ai, TransactionService $transactionService)
-    {
+    public function __construct(
+        TelegramService $telegram, 
+        AIManager $ai, 
+        TransactionService $transactionService,
+        ReportService $reportService
+    ) {
         $this->telegram = $telegram;
         $this->ai = $ai;
         $this->transactionService = $transactionService;
+        $this->reportService = $reportService;
     }
 
     /**
@@ -80,11 +87,13 @@ class TelegramWebhookController extends Controller
 
         switch ($command) {
             case '/start':
-                $message = "👋 Halo! Saya adalah Bot Transaksi AI Anda.\n\nKirimkan pesan teks seperti:\n- \"Beli kopi 20rb\"\n- \"Gajian 5 juta\"\n\nSaya akan mencatatnya secara otomatis!";
+                $message = "👋 Halo! Saya adalah Bot Transaksi AI Anda.\n\nKirimkan pesan teks seperti:\n- \"Beli kopi 20rb\"\n- \"Gajian 5 juta\"\n\nAtau tanya laporan:\n- \"Berapa pengeluaran saya hari ini?\"\n- \"Rekap minggu ini\"";
                 break;
             case '/help':
-                $message = "ℹ️ **Bantuan**\n\nUntuk mencatat transaksi, cukup ketik detailnya. Contoh:\n\"Makan siang 25000\"\n\"Topup e-wallet 100rb\"";
+                $message = "ℹ️ **Bantuan**\n\n- **Catat**: \"Makan siang 25rb\"\n- **Laporan**: \"Rekap hari ini\" atau gunakan perintah /rekap";
                 break;
+            case '/rekap':
+                return $this->sendReport($chatId, 'today');
             default:
                 $message = "❓ Perintah tidak dikenal. Ketik /help untuk bantuan.";
                 break;
@@ -99,35 +108,87 @@ class TelegramWebhookController extends Controller
      */
     protected function handleNaturalLanguage($chatId, $text)
     {
-        $parsed = $this->ai->parseTransaction($text);
+        $result = $this->ai->processMessage($text);
 
-        if (!$parsed) {
-            $this->telegram->sendMessage($chatId, "🤔 Maaf, saya tidak mengerti maksud Anda. Bisa diulangi dengan lebih jelas? (Contoh: \"Beli bakso 15rb\")");
+        if (!$result) {
+            $this->telegram->sendMessage($chatId, "🤔 Maaf, saya tidak mengerti maksud Anda. Bisa diulangi dengan lebih jelas?");
             return response()->json(['status' => 'success', 'type' => 'nlp_failed']);
         }
 
-        // Save to database
-        $transaction = $this->transactionService->createFromTelegram($parsed, (string)$chatId);
-
-        if (!$transaction) {
-            $this->telegram->sendMessage($chatId, "⚠️ Terjadi kesalahan saat menyimpan data. Silakan coba lagi nanti.");
-            return response()->json(['status' => 'error', 'message' => 'Failed to save transaction']);
+        if ($result['intent'] === 'REPORT') {
+            $range = $result['params']['range'] ?? 'today';
+            return $this->sendReport($chatId, $range, $result['_ai_driver']);
         }
 
-        $type = ($parsed['type'] === 'income') ? '🟢 Pemasukan' : '🔴 Pengeluaran';
-        $amount = number_format($parsed['amount'], 0, ',', '.');
-        $category = $parsed['category'] ?? 'Umum';
-        $description = $parsed['description'] ?? '-';
-        $driver = $parsed['_ai_driver'] ?? 'unknown';
+        if ($result['intent'] === 'RECORD' && isset($result['data'])) {
+            return $this->recordTransaction($chatId, $result['data'], $result['_ai_driver']);
+        }
 
-        $reply = "✅ **Berhasil Dicatat!**\n\n" .
+        $this->telegram->sendMessage($chatId, "😅 Saya paham kata Anda, tapi belum yakin apa yang harus dilakukan.");
+        return response()->json(['status' => 'success', 'type' => 'nlp_fallback']);
+    }
+
+    /**
+     * Internal helper to record a transaction.
+     */
+    protected function recordTransaction($chatId, $data, $driver)
+    {
+        $data['_ai_driver'] = $driver;
+        $transaction = $this->transactionService->createFromTelegram($data, (string)$chatId);
+
+        if (!$transaction) {
+            $this->telegram->sendMessage($chatId, "⚠️ Terjadi kesalahan saat menyimpan data.");
+            return response()->json(['status' => 'error']);
+        }
+
+        $type = ($data['type'] === 'income') ? '🟢 Pemasukan' : '🔴 Pengeluaran';
+        $amount = number_format($data['amount'], 0, ',', '.');
+        $reply = "✅ **Berhasil Dicatat!** ({$driver})\n\n" .
                  "• **Tipe**: {$type}\n" .
                  "• **Jumlah**: Rp {$amount}\n" .
-                 "• **Kategori**: {$category}\n" .
-                 "• **Deskripsi**: {$description}\n\n" .
-                 "*(Data telah aman disimpan di database)*";
+                 "• **Kategori**: " . ($data['category'] ?? 'Umum');
         
         $this->telegram->sendMessage($chatId, $reply);
-        return response()->json(['status' => 'success', 'type' => 'nlp_parsed', 'data' => $parsed]);
+        return response()->json(['status' => 'success', 'type' => 'record']);
+    }
+
+    /**
+     * Internal helper to send a financial report.
+     */
+    protected function sendReport($chatId, $range, $driver = 'manual')
+    {
+        $summary = $this->reportService->getSummary((string)$chatId, $range);
+
+        $rangeText = [
+            'today' => 'Hari Ini',
+            'week' => 'Minggu Ini',
+            'month' => 'Bulan Ini'
+        ][$range] ?? $range;
+
+        $income = number_format($summary['income'], 0, ',', '.');
+        $expense = number_format($summary['expense'], 0, ',', '.');
+        $balance = number_format($summary['balance'], 0, ',', '.');
+
+        $reply = "📊 **Laporan Keuangan ({$rangeText})**\n" .
+                 "--------------------------\n" .
+                 "🟢 Pemasukan: Rp {$income}\n" .
+                 "🔴 Pengeluaran: Rp {$expense}\n" .
+                 "--------------------------\n" .
+                 "💰 **Saldo Bersih: Rp {$balance}**\n\n" .
+                 "Jumlah Transaksi: {$summary['count']}";
+
+        if ($range === 'month' || $range === 'today') {
+            $breakdown = $this->reportService->getCategoryBreakdown((string)$chatId, $range);
+            if (!empty($breakdown)) {
+                $reply .= "\n\n📂 **Top Pengeluaran:**";
+                foreach (array_slice($breakdown, 0, 3) as $item) {
+                    $amt = number_format($item['total'], 0, ',', '.');
+                    $reply .= "\n- {$item['category']}: Rp {$amt}";
+                }
+            }
+        }
+
+        $this->telegram->sendMessage($chatId, $reply);
+        return response()->json(['status' => 'success', 'type' => 'report']);
     }
 }

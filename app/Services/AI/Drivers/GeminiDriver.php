@@ -13,7 +13,7 @@ class GeminiDriver implements LLMDriverInterface
         return 'gemini';
     }
 
-    public function parse(string $text): ?array
+    public function process(string $text): ?array
     {
         $config = config('services.gemini');
         
@@ -26,15 +26,17 @@ class GeminiDriver implements LLMDriverInterface
                 'contents' => [
                     [
                         'parts' => [
-                            ['text' => "Extract transaction data from the text into a valid JSON object with keys: 
-                            'type' (must be 'income' or 'expense'), 
-                            'amount' (integer), 
-                            'category' (short string), 
-                            'description' (short string). 
-                            If it's not a transaction, return exactly: null. 
-                            Text: \"{$text}\"
-                            ONLY return the JSON or null, no other text. 
-                            Remove any markdown formatting like ```json."
+                            ['text' => "Classify and extract data from human text.
+                            Return a JSON object with:
+                            - 'intent': 'RECORD' (if user wants to save a transaction) or 'REPORT' (if user asks for summary/insight).
+                            - If 'RECORD', add 'data': { 'type': 'income'|'expense', 'amount': int, 'category': string, 'description': string }.
+                            - If 'REPORT', add 'params': { 'range': 'today'|'week'|'month' }.
+                            
+                            Example RECORD: \"Beli bakso 15rb\" -> { \"intent\": \"RECORD\", \"data\": { ... } }
+                            Example REPORT: \"Pengeluaran saya hari ini\" -> { \"intent\": \"REPORT\", \"params\": { \"range\": \"today\" } }
+                            
+                            Input: \"{$text}\"
+                            ONLY return the JSON, no other text. Remove markdown formatting like ```json."
                             ]
                         ]
                     ]
@@ -46,10 +48,7 @@ class GeminiDriver implements LLMDriverInterface
 
             if ($response->successful()) {
                 $content = $response->json('candidates.0.content.parts.0.text');
-                
-                // Gemini might return text with markdown blocks even if asked not to
                 $cleanContent = preg_replace('/```json\s*|\s*```/', '', $content);
-                
                 return json_decode(trim($cleanContent), true);
             }
 

@@ -20,9 +20,9 @@ class AIManager
     }
 
     /**
-     * Parse text by trying drivers in the priority order.
+     * Process text by trying drivers in the priority order to get intent and data.
      */
-    public function parseTransaction(string $text): ?array
+    public function processMessage(string $text): ?array
     {
         $priorityString = config('services.ai.priority', 'groq,gemini');
         $priorityOrder = explode(',', $priorityString);
@@ -35,11 +35,11 @@ class AIManager
             }
 
             $driver = $this->drivers[$driverName];
-            Log::info("Attempting to parse transaction with: {$driverName}");
+            Log::info("Attempting to process message with: {$driverName}");
 
-            $result = $driver->parse($text);
+            $result = $driver->process($text);
 
-            if ($result !== null) {
+            if ($result !== null && isset($result['intent'])) {
                 // Attach driver info for audit/logging
                 $result['_ai_driver'] = $driverName;
                 return $result;
@@ -48,7 +48,7 @@ class AIManager
             Log::warning("AI Driver {$driverName} failed or returned null. Trying next...");
         }
 
-        Log::error("All AI Drivers failed to parse text: {$text}");
+        Log::error("All AI Drivers failed to process message: {$text}");
         return null;
     }
 }

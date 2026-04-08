@@ -5,12 +5,12 @@ namespace App\Services\AI;
 interface LLMDriverInterface
 {
     /**
-     * Parse text into structured transaction data.
+     * Parse text and determine if it's a RECORD, REPORT, or UNKNOWN intent.
      * 
      * @param string $text
-     * @return array|null [type, amount, category, description]
+     * @return array|null [intent, data|params]
      */
-    public function parse(string $text): ?array;
+    public function process(string $text): ?array;
 
     /**
      * Get the driver name.
