@@ -2,8 +2,10 @@
 
 namespace App\Services\AI;
 
+use App\Models\Transaction;
 use App\Services\AI\Drivers\GeminiDriver;
 use App\Services\AI\Drivers\GroqDriver;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 
 class AIManager
@@ -22,8 +24,20 @@ class AIManager
     /**
      * Process text by trying drivers in the priority order to get intent and data.
      */
-    public function processMessage(string $text): ?array
+    public function processMessage(string $text, string $telegramUserId = null): ?array
     {
+        $context = [
+            'today' => Carbon::now()->isoFormat('dddd, D MMMM YYYY'),
+            'categories' => []
+        ];
+
+        if ($telegramUserId) {
+            $context['categories'] = Transaction::where('telegram_user_id', $telegramUserId)
+                ->distinct()
+                ->pluck('category')
+                ->toArray();
+        }
+
         $priorityString = config('services.ai.priority', 'groq,gemini');
         $priorityOrder = explode(',', $priorityString);
 
@@ -37,9 +51,17 @@ class AIManager
             $driver = $this->drivers[$driverName];
             Log::info("Attempting to process message with: {$driverName}");
 
-            $result = $driver->process($text);
+            $result = $driver->process($text, $context);
 
             if ($result !== null && isset($result['intent'])) {
+                // Strict Validation for RECORD
+                if ($result['intent'] === 'RECORD') {
+                    if (!isset($result['data']['amount'], $result['data']['type'])) {
+                        Log::warning("AI Driver {$driverName} returned RECORD without required fields. Trying next...");
+                        continue;
+                    }
+                }
+
                 // Attach driver info for audit/logging
                 $result['_ai_driver'] = $driverName;
                 return $result;

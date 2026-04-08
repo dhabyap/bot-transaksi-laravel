@@ -13,13 +13,16 @@ class GroqDriver implements LLMDriverInterface
         return 'groq';
     }
 
-    public function process(string $text): ?array
+    public function process(string $text, array $context = []): ?array
     {
         $config = config('services.groq');
         
         if (empty($config['key'])) {
             return null;
         }
+
+        $categories = !empty($context['categories']) ? implode(', ', $context['categories']) : 'None yet';
+        $today = $context['today'] ?? now()->toDateString();
 
         try {
             $response = Http::withToken($config['key'])
@@ -29,15 +32,15 @@ class GroqDriver implements LLMDriverInterface
                         [
                             'role' => 'system',
                             'content' => "Classify and extract data from human text.
+                            Today's Date: {$today}. 
+                            Existing categories: [{$categories}]. Use these if appropriate.
+                            
                             Return a JSON object with:
-                            - 'intent': 'RECORD' (if user wants to save a transaction) or 'REPORT' (if user asks for summary/insight).
+                            - 'intent': 'RECORD' or 'REPORT'.
                             - If 'RECORD', add 'data': { 'type': 'income'|'expense', 'amount': int, 'category': string, 'description': string }.
                             - If 'REPORT', add 'params': { 'range': 'today'|'week'|'month' }.
                             
-                            Example RECORD: \"Beli bakso 15rb\" -> { \"intent\": \"RECORD\", \"data\": { ... } }
-                            Example REPORT: \"Pengeluaran saya hari ini\" -> { \"intent\": \"REPORT\", \"params\": { \"range\": \"today\" } }
-                            
-                            If unknown, return: null. ONLY JSON or null."
+                            ONLY JSON or null."
                         ],
                         ['role' => 'user', 'content' => $text]
                     ],

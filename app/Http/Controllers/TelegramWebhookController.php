@@ -108,7 +108,7 @@ class TelegramWebhookController extends Controller
      */
     protected function handleNaturalLanguage($chatId, $text)
     {
-        $result = $this->ai->processMessage($text);
+        $result = $this->ai->processMessage($text, (string)$chatId);
 
         if (!$result) {
             $this->telegram->sendMessage($chatId, "🤔 Maaf, saya tidak mengerti maksud Anda. Bisa diulangi dengan lebih jelas?");
