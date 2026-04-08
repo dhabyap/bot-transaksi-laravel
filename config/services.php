@@ -36,4 +36,19 @@ return [
         'authorized_ids' => env('TELEGRAM_AUTHORIZED_IDS'),
     ],
 
+    'ai' => [
+        'priority' => env('AI_DRIVER_PRIORITY', 'groq,gemini'),
+    ],
+
+    'groq' => [
+        'key' => env('GROQ_API_KEY'),
+        'endpoint' => 'https://api.groq.com/openai/v1/chat/completions',
+        'model' => 'llama3-8b-8192',
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'endpoint' => 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
+    ],
+
 ];

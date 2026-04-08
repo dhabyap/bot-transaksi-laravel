@@ -30,12 +30,30 @@ class TelegramWebhookTest extends TestCase
     }
 
     /**
-     * Test logic for natural language text.
+     * Test logic for natural language text with AI parsing.
      */
-    public function test_telegram_webhook_handles_nlp_text(): void
+    public function test_telegram_webhook_handles_nlp_text_with_ai(): void
     {
+        // Set dummy keys for the test context
+        config(['services.groq.key' => 'dummy_groq_key']);
+        config(['services.gemini.key' => 'dummy_gemini_key']);
+
         Http::fake([
             'api.telegram.org/*' => Http::response(['ok' => true], 200),
+            'api.groq.com/*' => Http::response([
+                'choices' => [
+                    [
+                        'message' => [
+                            'content' => json_encode([
+                                'type' => 'expense',
+                                'amount' => 20000,
+                                'category' => 'Food',
+                                'description' => 'Beli kopi'
+                            ])
+                        ]
+                    ]
+                ]
+            ], 200),
         ]);
 
         $response = $this->postJson('/api/webhook/telegram', [
@@ -46,6 +64,7 @@ class TelegramWebhookTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJson(['status' => 'success', 'type' => 'nlp']);
+        $response->assertJson(['status' => 'success', 'type' => 'nlp_parsed']);
+        $this->assertEquals(20000, $response->json('data.amount'));
     }
 }
