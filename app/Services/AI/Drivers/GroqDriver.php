@@ -13,7 +13,7 @@ class GroqDriver implements LLMDriverInterface
         return 'groq';
     }
 
-    public function parse(string $text): ?array
+    public function process(string $text): ?array
     {
         $config = config('services.groq');
         
@@ -28,13 +28,16 @@ class GroqDriver implements LLMDriverInterface
                     'messages' => [
                         [
                             'role' => 'system',
-                            'content' => "Extract transaction data from the text into a valid JSON object with keys: 
-                            'type' (must be 'income' or 'expense'), 
-                            'amount' (integer), 
-                            'category' (short string), 
-                            'description' (short string). 
-                            If it's not a transaction, return exactly: null. 
-                            ONLY return the JSON or null, no other text."
+                            'content' => "Classify and extract data from human text.
+                            Return a JSON object with:
+                            - 'intent': 'RECORD' (if user wants to save a transaction) or 'REPORT' (if user asks for summary/insight).
+                            - If 'RECORD', add 'data': { 'type': 'income'|'expense', 'amount': int, 'category': string, 'description': string }.
+                            - If 'REPORT', add 'params': { 'range': 'today'|'week'|'month' }.
+                            
+                            Example RECORD: \"Beli bakso 15rb\" -> { \"intent\": \"RECORD\", \"data\": { ... } }
+                            Example REPORT: \"Pengeluaran saya hari ini\" -> { \"intent\": \"REPORT\", \"params\": { \"range\": \"today\" } }
+                            
+                            If unknown, return: null. ONLY JSON or null."
                         ],
                         ['role' => 'user', 'content' => $text]
                     ],

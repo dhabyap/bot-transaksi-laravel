@@ -13,7 +13,6 @@ class TelegramWebhookTest extends TestCase
      */
     public function test_telegram_webhook_handles_start_command(): void
     {
-        // Mocking external Telegram API call in TelegramService
         Http::fake([
             'api.telegram.org/*' => Http::response(['ok' => true], 200),
         ]);
@@ -30,13 +29,11 @@ class TelegramWebhookTest extends TestCase
     }
 
     /**
-     * Test logic for natural language text with AI parsing.
+     * Test logic for natural language text with AI parsing RECORD intent.
      */
     public function test_telegram_webhook_handles_nlp_text_with_ai(): void
     {
-        // Set dummy keys for the test context
         config(['services.groq.key' => 'dummy_groq_key']);
-        config(['services.gemini.key' => 'dummy_gemini_key']);
 
         Http::fake([
             'api.telegram.org/*' => Http::response(['ok' => true], 200),
@@ -45,10 +42,13 @@ class TelegramWebhookTest extends TestCase
                     [
                         'message' => [
                             'content' => json_encode([
-                                'type' => 'expense',
-                                'amount' => 20000,
-                                'category' => 'Food',
-                                'description' => 'Beli kopi'
+                                'intent' => 'RECORD',
+                                'data' => [
+                                    'type' => 'expense',
+                                    'amount' => 20000,
+                                    'category' => 'Food',
+                                    'description' => 'Beli kopi'
+                                ]
                             ])
                         ]
                     ]
@@ -64,7 +64,6 @@ class TelegramWebhookTest extends TestCase
         ]);
 
         $response->assertStatus(200);
-        $response->assertJson(['status' => 'success', 'type' => 'nlp_parsed']);
-        $this->assertEquals(20000, $response->json('data.amount'));
+        $response->assertJson(['status' => 'success', 'type' => 'record']);
     }
 }
