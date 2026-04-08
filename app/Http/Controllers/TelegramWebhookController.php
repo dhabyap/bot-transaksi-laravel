@@ -2,12 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\BotUser;
+use App\Models\ChatLog;
 use App\Services\AI\AIManager;
 use App\Services\TelegramService;
 use App\Services\TransactionService;
 use App\Services\ReportService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class TelegramWebhookController extends Controller
 {
@@ -47,6 +50,9 @@ class TelegramWebhookController extends Controller
         if (!$chatId) {
             return response()->json(['status' => 'error', 'message' => 'No chat ID found']);
         }
+
+        // Log Activity & Tracking
+        $this->logActivity($message);
 
         // 2. Security Guard: Authorization Check
         if (!$this->isAuthorized($chatId)) {
@@ -190,5 +196,47 @@ class TelegramWebhookController extends Controller
 
         $this->telegram->sendMessage($chatId, $reply);
         return response()->json(['status' => 'success', 'type' => 'report']);
+    }
+
+    /**
+     * Log user activity and track message count.
+     */
+    protected function logActivity(array $message)
+    {
+        $from = $message['from'] ?? null;
+        if (!$from) return;
+
+        $userId = $from['id'];
+        $now = now();
+
+        // 1. Log Activity (User Tracking)
+        $user = BotUser::find($userId);
+        if (!$user) {
+            BotUser::create([
+                'user_id' => $userId,
+                'first_name' => $from['first_name'] ?? null,
+                'last_name' => $from['last_name'] ?? null,
+                'username' => $from['username'] ?? null,
+                'language_code' => $from['language_code'] ?? null,
+                'first_seen' => $now,
+                'last_active' => $now,
+                'message_count' => 1
+            ]);
+        } else {
+            $user->update([
+                'first_name' => $from['first_name'] ?? $user->first_name,
+                'last_name' => $from['last_name'] ?? $user->last_name,
+                'username' => $from['username'] ?? $user->username,
+                'last_active' => $now,
+                'message_count' => $user->message_count + 1
+            ]);
+        }
+
+        // 2. Log Chat Message
+        ChatLog::create([
+            'user_id' => $userId,
+            'message' => $message['text'] ?? '',
+            'timestamp' => $now
+        ]);
     }
 }
