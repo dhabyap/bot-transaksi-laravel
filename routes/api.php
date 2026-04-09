@@ -12,6 +12,7 @@ use Illuminate\Support\Facades\Route;
 */
 
 Route::get('/status', [StatusController::class, 'index']);
+Route::get('/webhook/telegram', [TelegramWebhookController::class, 'verify']);
 Route::post('/webhook/telegram', [TelegramWebhookController::class, 'handle']);
 
 Route::middleware('auth:sanctum')->get('/user', function (Request $request) {

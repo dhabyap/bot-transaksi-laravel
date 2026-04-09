@@ -20,7 +20,38 @@ Bot Telegram berbasis AI untuk pencatatan transaksi keuangan otomatis dan pelapo
 2. Jalankan `composer install`.
 3. Copy `.env.example` ke `.env` dan isi API Key Anda.
 4. Jalankan migrasi: `php artisan migrate`.
-5. Daftarkan webhook Telegram Anda.
+5. [Setup Webhook Telegram](#-setup-webhook-telegram).
+6. [Cek Status Bot](#-cek-status-bot).
+
+## 🔗 Setup Webhook Telegram
+
+Bot ini menggunakan metode **Webhook** untuk menerima pesan. Anda harus mendaftarkan URL aplikasi Anda ke Telegram agar Bot bisa merespon.
+
+### Cara 1: Menggunakan Artisan (Direkomendasikan)
+Setelah mengisi `TELEGRAM_BOT_TOKEN` di `.env`, jalankan perintah berikut di terminal:
+```bash
+# Otomatis menggunakan APP_URL dari .env
+php artisan telegram:manage set-webhook
+```
+
+### Cara 2: Manual via Browser
+Buka URL berikut di browser Anda (ganti `<TOKEN>` dan `<DOMAIN>`):
+`https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://<DOMAIN>/api/webhook/telegram`
+
+---
+
+## 🚦 Cek Status Bot
+
+Untuk memastikan Bot dan semua API (Groq/Gemini/Database) berjalan dengan baik, Anda bisa mengeceknya melalui:
+
+1. **Terminal**:
+   ```bash
+   php artisan telegram:manage info
+   php artisan telegram:manage status
+   ```
+
+2. **Browser (API Endpoint)**:
+   Buka `https://domain-anda.com/api/status` untuk melihat laporan kesehatan sistem dalam format JSON.
 
 ## 📂 Struktur Dokumentasi
 - [Panduan Migrasi dari Python](docs/MIGRATION_GUIDE.md)

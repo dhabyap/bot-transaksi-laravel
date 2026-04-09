@@ -42,7 +42,16 @@ php artisan optimize
 ```
 
 ## 5. Registrasi Webhook Telegram
-Setelah domain aktif, daftarkan URL webhook Anda ke Telegram:
+Setelah domain aktif, Anda harus mendaftarkan URL webhook Anda ke Telegram:
+
+### Cara 1: Via SSH (Rekomendasi)
+Jalankan perintah ini di terminal SSH:
+```bash
+php artisan telegram:manage set-webhook
+```
+
+### Cara 2: Manual via Browser
+Buka URL berikut:
 `https://api.telegram.org/bot<TOKEN>/setWebhook?url=https://domain-anda.com/api/webhook/telegram`
 
 ## 6. Troubleshoot

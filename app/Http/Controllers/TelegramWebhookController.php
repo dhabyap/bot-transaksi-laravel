@@ -199,6 +199,18 @@ class TelegramWebhookController extends Controller
     }
 
     /**
+     * Handle GET requests to the webhook URL (fallback for browser visits).
+     */
+    public function verify()
+    {
+        return response()->json([
+            'status' => 'active',
+            'message' => 'Telegram Webhook is Active. This endpoint expects POST requests from Telegram API.',
+            'documentation' => 'https://core.telegram.org/bots/api#setwebhook'
+        ]);
+    }
+
+    /**
      * Log user activity and track message count.
      */
     protected function logActivity(array $message)
