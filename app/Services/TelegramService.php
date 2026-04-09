@@ -39,4 +39,48 @@ class TelegramService
             return false;
         }
     }
+
+    /**
+     * Get basic information about the bot.
+     */
+    public function getMe(): array|bool
+    {
+        try {
+            $response = Http::get("{$this->baseUrl}/getMe");
+            return $response->successful() ? $response->json() : false;
+        } catch (\Exception $e) {
+            Log::error("Telegram getMe Exception: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Set the webhook for the bot.
+     */
+    public function setWebhook(string $url): array|bool
+    {
+        try {
+            $response = Http::post("{$this->baseUrl}/setWebhook", [
+                'url' => $url
+            ]);
+            return $response->successful() ? $response->json() : false;
+        } catch (\Exception $e) {
+            Log::error("Telegram setWebhook Exception: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get information about the current webhook status.
+     */
+    public function getWebhookInfo(): array|bool
+    {
+        try {
+            $response = Http::get("{$this->baseUrl}/getWebhookInfo");
+            return $response->successful() ? $response->json() : false;
+        } catch (\Exception $e) {
+            Log::error("Telegram getWebhookInfo Exception: " . $e->getMessage());
+            return false;
+        }
+    }
 }
