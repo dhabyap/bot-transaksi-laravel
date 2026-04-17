@@ -83,4 +83,39 @@ class TelegramService
             return false;
         }
     }
+
+    /**
+     * Delete the webhook.
+     */
+    public function deleteWebhook(): array|bool
+    {
+        try {
+            $response = Http::post("{$this->baseUrl}/deleteWebhook");
+            return $response->successful() ? $response->json() : false;
+        } catch (\Exception $e) {
+            Log::error("Telegram deleteWebhook Exception: " . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get updates (for long polling).
+     */
+    public function getUpdates(int $offset = 0, int $timeout = 30): array|bool
+    {
+        try {
+            // HTTP client timeout must be LONGER than the Telegram long-polling timeout
+            // otherwise cURL will kill the connection before Telegram responds
+            $response = Http::timeout($timeout + 5)
+                ->get("{$this->baseUrl}/getUpdates", [
+                    'offset' => $offset,
+                    'timeout' => $timeout,
+                    'allowed_updates' => ['message']
+                ]);
+            return $response->successful() ? $response->json() : false;
+        } catch (\Exception $e) {
+            Log::error("Telegram getUpdates Exception: " . $e->getMessage());
+            return false;
+        }
+    }
 }
