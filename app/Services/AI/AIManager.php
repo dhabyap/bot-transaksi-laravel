@@ -41,6 +41,8 @@ class AIManager
         $priorityString = config('services.ai.priority', 'groq,gemini');
         $priorityOrder = explode(',', $priorityString);
 
+        $wasBusy = false;
+
         foreach ($priorityOrder as $driverName) {
             $driverName = trim($driverName);
             
@@ -53,21 +55,34 @@ class AIManager
 
             $result = $driver->process($text, $context);
 
-            if ($result !== null && isset($result['intent'])) {
-                // Strict Validation for RECORD
-                if ($result['intent'] === 'RECORD') {
-                    if (!isset($result['data']['amount'], $result['data']['type'])) {
-                        Log::warning("AI Driver {$driverName} returned RECORD without required fields. Trying next...");
-                        continue;
-                    }
+            if ($result !== null) {
+                // Check if driver explicitly reported being busy
+                if (isset($result['error']) && $result['error'] === 'busy') {
+                    Log::warning("AI Driver {$driverName} is busy (429). Trying next driver...");
+                    $wasBusy = true;
+                    continue;
                 }
 
-                // Attach driver info for audit/logging
-                $result['_ai_driver'] = $driverName;
-                return $result;
+                if (isset($result['intent'])) {
+                    // Strict Validation for RECORD
+                    if ($result['intent'] === 'RECORD') {
+                        if (!isset($result['data']['amount'], $result['data']['type'])) {
+                            Log::warning("AI Driver {$driverName} returned RECORD without required fields. Trying next...");
+                            continue;
+                        }
+                    }
+
+                    // Attach driver info for audit/logging
+                    $result['_ai_driver'] = $driverName;
+                    return $result;
+                }
             }
 
             Log::warning("AI Driver {$driverName} failed or returned null. Trying next...");
+        }
+
+        if ($wasBusy) {
+            return ['error' => 'busy'];
         }
 
         Log::error("All AI Drivers failed to process message: {$text}");

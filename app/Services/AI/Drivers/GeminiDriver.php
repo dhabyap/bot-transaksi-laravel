@@ -55,6 +55,10 @@ class GeminiDriver implements LLMDriverInterface
                 return json_decode(trim($cleanContent), true);
             }
 
+            if ($response->status() === 429) {
+                return ['error' => 'busy', 'code' => 429];
+            }
+
             Log::error("Gemini API Error: " . $response->body());
             return null;
         } catch (\Exception $e) {
