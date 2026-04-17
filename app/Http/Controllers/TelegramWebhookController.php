@@ -100,6 +100,14 @@ class TelegramWebhookController extends Controller
                 break;
             case '/rekap':
                 return $this->sendReport($chatId, 'today');
+            case '/riwayat':
+                return $this->sendHistory($chatId);
+            case '/edit':
+                return $this->handleEdit($chatId, $text);
+            case '/hapus':
+                return $this->handleDelete($chatId, $text);
+            case '/profile':
+                return $this->sendProfile($chatId);
             default:
                 $message = "❓ Perintah tidak dikenal. Ketik /help untuk bantuan.";
                 break;
@@ -202,6 +210,128 @@ class TelegramWebhookController extends Controller
 
         $this->telegram->sendMessage($chatId, $reply);
         return response()->json(['status' => 'success', 'type' => 'report']);
+    }
+
+    /**
+     * Send transaction history.
+     */
+    protected function sendHistory($chatId)
+    {
+        $history = $this->transactionService->getHistory((string)$chatId);
+
+        if ($history->isEmpty()) {
+            $this->telegram->sendMessage($chatId, "📭 Belum ada riwayat transaksi.");
+            return response()->json(['status' => 'success', 'type' => 'history_empty']);
+        }
+
+        $reply = "📜 **Riwayat 10 Transaksi Terakhir**\n\n";
+        foreach ($history as $trx) {
+            $type = ($trx->tipe === 'income') ? '🟢' : '🔴';
+            $amount = number_format($trx->nominal, 0, ',', '.');
+            $date = $trx->created_at->format('d/m/y H:i');
+            $reply .= "• `ID: {$trx->id}` {$type} Rp {$amount} - {$trx->item} ({$date})\n";
+        }
+
+        $reply .= "\n💡 Gunakan `/edit <ID> <teks>` atau `/hapus <ID>` untuk mengelola data.";
+
+        $this->telegram->sendMessage($chatId, $reply);
+        return response()->json(['status' => 'success', 'type' => 'history']);
+    }
+
+    /**
+     * Handle transaction editing.
+     */
+    protected function handleEdit($chatId, $text)
+    {
+        $parts = explode(' ', $text, 3);
+        if (count($parts) < 3) {
+            $this->telegram->sendMessage($chatId, "⚠️ Format salah. Gunakan: `/edit <ID> <teks baru>`\nContoh: `/edit 10 beli bakso 20rb`.");
+            return response()->json(['status' => 'success', 'type' => 'edit_format_error']);
+        }
+
+        $id = $parts[1];
+        $newText = $parts[2];
+
+        // Process with AI first to extract new details
+        $result = $this->ai->processMessage($newText, (string)$chatId);
+        if (!$result || !isset($result['data'])) {
+            $this->telegram->sendMessage($chatId, "🤔 Maaf, AI tidak memahami deskripsi baru Anda. Silakan coba kata-kata lain.");
+            return response()->json(['status' => 'success', 'type' => 'edit_ai_failed']);
+        }
+
+        $driver = $result['_ai_driver'] ?? 'unknown';
+        $updated = $this->transactionService->updateTransaction((int)$id, (string)$chatId, array_merge($result['data'], ['_ai_driver' => $driver]));
+
+        if (!$updated) {
+            $this->telegram->sendMessage($chatId, "❌ Gagal memperbarui transaksi. Pastikan ID benar dan itu adalah transaksi milik Anda.");
+            return response()->json(['status' => 'success', 'type' => 'edit_failed']);
+        }
+
+        $type = ($updated->tipe === 'income') ? '🟢 Pemasukan' : '🔴 Pengeluaran';
+        $amount = number_format($updated->nominal, 0, ',', '.');
+        $reply = "✅ **Berhasil Diperbarui!** ({$driver})\n\n" .
+                 "• **ID**: {$updated->id}\n" .
+                 "• **Tipe**: {$type}\n" .
+                 "• **Jumlah**: Rp {$amount}\n" .
+                 "• **Kategori**: {$updated->kategori}";
+
+        $this->telegram->sendMessage($chatId, $reply);
+        return response()->json(['status' => 'success', 'type' => 'edit_success']);
+    }
+
+    /**
+     * Handle transaction deletion.
+     */
+    protected function handleDelete($chatId, $text)
+    {
+        $parts = explode(' ', $text);
+        if (count($parts) < 2) {
+            $this->telegram->sendMessage($chatId, "⚠️ Format salah. Gunakan: `/hapus <ID>`\nContoh: `/hapus 10`.");
+            return response()->json(['status' => 'success', 'type' => 'delete_format_error']);
+        }
+
+        $id = $parts[1];
+        $success = $this->transactionService->deleteTransaction((int)$id, (string)$chatId);
+
+        if (!$success) {
+            $this->telegram->sendMessage($chatId, "❌ Gagal menghapus transaksi. Pastikan ID benar dan itu adalah transaksi milik Anda.");
+            return response()->json(['status' => 'success', 'type' => 'delete_failed']);
+        }
+
+        $this->telegram->sendMessage($chatId, "✅ Transaksi `ID: {$id}` telah dihapus.");
+        return response()->json(['status' => 'success', 'type' => 'delete_success']);
+    }
+
+    /**
+     * Send user profile and statistics.
+     */
+    protected function sendProfile($chatId)
+    {
+        $user = BotUser::find($chatId);
+        $summary = $this->reportService->getSummary((string)$chatId, 'month');
+
+        $firstName = $user->first_name ?? 'Pengguna';
+        $since = $user->first_seen ? $user->first_seen->format('d M Y') : '-';
+        $msgCount = $user->message_count ?? 0;
+        
+        $income = number_format($summary['income'], 0, ',', '.');
+        $expense = number_format($summary['expense'], 0, ',', '.');
+        $balance = number_format($summary['balance'], 0, ',', '.');
+
+        $reply = "👤 **Profil Pengguna**\n" .
+                 "--------------------------\n" .
+                 "• **Nama**: {$firstName}\n" .
+                 "• **Username**: @".($user->username ?? '-')."\n" .
+                 "• **Bergabung**: {$since}\n" .
+                 "• **Total Chat**: {$msgCount}\n\n" .
+                 "📊 **Statistik Bulan Ini**\n" .
+                 "• Pemasukan: Rp {$income}\n" .
+                 "• Pengeluaran: Rp {$expense}\n" .
+                 "• **Saldo Bersih**: Rp {$balance}\n\n" .
+                 "Tetap semangat mencatat! 🚀";
+
+        $this->telegram->sendMessage($chatId, $reply);
+        return response()->json(['status' => 'success', 'type' => 'profile']);
     }
 
     /**
