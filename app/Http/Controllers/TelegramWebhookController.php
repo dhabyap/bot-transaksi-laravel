@@ -121,6 +121,12 @@ class TelegramWebhookController extends Controller
             return response()->json(['status' => 'success', 'type' => 'nlp_failed']);
         }
 
+        // Handle System Error / Rate Limit (Epic 4)
+        if (isset($result['error']) && $result['error'] === 'busy') {
+            $this->telegram->sendMessage($chatId, "⚠️ Maaf, sistem AI sedang sibuk. Silakan coba beberapa saat lagi.");
+            return response()->json(['status' => 'success', 'type' => 'system_busy']);
+        }
+
         if ($result['intent'] === 'REPORT') {
             $range = $result['params']['range'] ?? 'today';
             return $this->sendReport($chatId, $range, $result['_ai_driver']);

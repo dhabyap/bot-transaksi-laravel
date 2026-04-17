@@ -53,6 +53,10 @@ class GroqDriver implements LLMDriverInterface
                 return json_decode($content, true);
             }
 
+            if ($response->status() === 429) {
+                return ['error' => 'busy', 'code' => 429];
+            }
+
             Log::error("Groq API Error: " . $response->body());
             return null;
         } catch (\Exception $e) {
